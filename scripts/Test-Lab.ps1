@@ -2,6 +2,7 @@
 Push-Location "$PSScriptRoot\.."
 try {
     Invoke-Docker compose config --quiet
+    Invoke-Docker compose up -d --wait --wait-timeout 180 --scale worker=1
     $headers = New-LabSession
     $other = New-LabSession
     $products = Invoke-RestMethod 'http://localhost:8080/api/produtos'
@@ -31,8 +32,10 @@ try {
     Start-Sleep -Seconds 2
     $state = Invoke-RestMethod "http://localhost:8080/api/relatorios/$($pending.id)" -Headers $headers
     Assert-Lab ($state.status -eq 'NaFila') 'Mensagem nao permaneceu pendente'
-    $queue = Invoke-RestMethod 'http://localhost:15672/api/queues/%2F/relatorios' -Headers (Get-RabbitHeaders)
-    Assert-Lab ($queue.messages_ready -ge 1) 'Fila sem mensagem pendente no broker'
+    $queued = Invoke-RestMethod 'http://localhost:15672/api/queues/%2F/relatorios/get' `
+        -Headers (Get-RabbitHeaders) -Method Post -ContentType 'application/json' `
+        -Body '{"count":100,"ackmode":"ack_requeue_true","encoding":"auto"}'
+    Assert-Lab ([bool]($queued | Where-Object { $_.payload -match [regex]::Escape($pending.id) })) 'Mensagem solicitada nao encontrada na fila'
     Invoke-Docker compose up -d --force-recreate rabbitmq
     Invoke-Docker compose up -d --wait --wait-timeout 180 rabbitmq
     Invoke-Docker compose up -d worker
