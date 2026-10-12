@@ -70,7 +70,9 @@ funcionam, mas a publicacao ainda precisa ser implementada. Complete:
 4. Build/push dos dois Dockerfiles, usando o commit completo como tag.
 5. Resumo informando namespace e versao publicados.
 
-Use a branch **gabarito** deste repositorio como referencia. Nao copie
+Use o [gabarito do template original](https://github.com/Racass/csharp-prod-deploy-template/tree/gabarito)
+como referencia; ele nao aparece automaticamente no repositorio criado a
+partir da branch principal. Nao copie
 credenciais pessoais para YAML (YAML Ain't Markup Language) ou para o Git.
 O token do workflow e fornecido pelo GitHub; nao crie um token pessoal.
 

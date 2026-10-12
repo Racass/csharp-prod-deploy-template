@@ -109,7 +109,7 @@ public sealed class ReportWorker(
                 return true;
             }
 
-            if (report.Status == StatusRelatorio.Concluido)
+            if (report.Conclusoes > 0)
             {
                 logger.LogInformation("Relatorio {ReportId} ja concluido; duplicata ignorada", id);
                 return false;
@@ -136,7 +136,7 @@ public sealed class ReportWorker(
         if (report.FalhaPermanente)
         {
             bool final = report.Tentativas >= ReportBroker.MaxAttempts;
-            await db.Relatorios.Where(item => item.Id == id && item.Status != StatusRelatorio.Concluido)
+            await db.Relatorios.Where(item => item.Id == id && item.Conclusoes == 0)
                 .ExecuteUpdateAsync(update => update
                     .SetProperty(item => item.Status, final ? StatusRelatorio.Falhou : StatusRelatorio.NaFila)
                     .SetProperty(item => item.Erro, "Falha permanente injetada pelo laboratorio."), ct);
@@ -162,7 +162,7 @@ public sealed class ReportWorker(
                 Total = item.Itens.Sum(line => line.Quantidade * line.ValorUnitario)
             }).ToListAsync(ct);
         string result = JsonSerializer.Serialize(rows);
-        int changed = await db.Relatorios.Where(item => item.Id == id && item.Status != StatusRelatorio.Concluido)
+        int changed = await db.Relatorios.Where(item => item.Id == id && item.Conclusoes == 0)
             .ExecuteUpdateAsync(update => update
                 .SetProperty(item => item.Resultado, result)
                 .SetProperty(item => item.Status, StatusRelatorio.Concluido)
