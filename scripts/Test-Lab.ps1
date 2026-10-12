@@ -34,7 +34,7 @@ try {
     } finally {
         $http.Dispose()
     }
-    Write-Host 'PASS: Identity, REST, GraphQL, mutation, relatorio e isolamento por usuario'
+    Write-Host "PASS: Identity, REST, GraphQL, mutation, relatorio e isolamento por usuario; id=$($first.id) tentativas=$($done.tentativas) conclusoes=$($done.conclusoes)"
     $duplicate = @{
         properties = @{ delivery_mode = 2; content_type = 'application/json'; message_id = $first.id }
         routing_key = 'relatorios'
@@ -54,7 +54,7 @@ try {
     Assert-Lab ([bool]$ignored) 'Worker nao confirmou tratamento da duplicata'
     $again = Wait-Report $first.id $headers
     Assert-Lab ($again.conclusoes -eq 1 -and $again.tentativas -eq $done.tentativas) 'Reentrega apos conclusao repetiu efeito'
-    Write-Host 'PASS: duplicata apos conclusao ignorada sem repetir efeito ou tentativa'
+    Write-Host "PASS: duplicata apos conclusao ignorada sem repetir efeito ou tentativa; id=$($first.id) tentativas=$($again.tentativas) conclusoes=$($again.conclusoes)"
 
     Invoke-Docker compose stop worker
     $pending = Request-Report $headers
@@ -70,7 +70,7 @@ try {
     Invoke-Docker compose up -d worker
     $done = Wait-Report $pending.id $headers
     Assert-Lab ($done.conclusoes -eq 1) 'Recuperacao duplicou resultado'
-    Write-Host 'PASS: worker parado, mensagem sobrevive a recriacao do broker e recuperacao'
+    Write-Host "PASS: worker parado, mensagem sobrevive a recriacao do broker e recuperacao; id=$($pending.id) conclusoes=$($done.conclusoes)"
 
     Invoke-Docker compose up -d --scale worker=2
     $batch = 1..4 | ForEach-Object { Request-Report $headers -Delay 2 }
@@ -85,7 +85,7 @@ try {
     $distribution = @($logs | Where-Object { $_ -match "Relatorio ($ids) tentativa \d+ worker " } |
         ForEach-Object { if ($_ -match 'worker (\S+)$') { $Matches[1] } } | Sort-Object -Unique)
     Assert-Lab ($distribution.Count -eq 2) 'Lote nao demonstrou processamento por dois workers'
-    Write-Host "PASS: quatro resultados unicos, distribuidos entre workers $($distribution -join ', ')"
+    Write-Host "PASS: quatro resultados unicos, distribuidos entre workers $($distribution -join ', '); lote=$($batch.id -join ', ')"
 
     Invoke-Docker compose up -d --scale worker=1
     $interrupted = Request-Report $headers -Delay 10
@@ -94,7 +94,7 @@ try {
     Invoke-Docker compose up -d worker
     $done = Wait-Report $interrupted.id $headers
     Assert-Lab ($done.conclusoes -eq 1 -and $done.tentativas -ge 2) 'Interrupcao nao produziu reentrega idempotente'
-    Write-Host 'PASS: interrupcao abrupta e reentrega'
+    Write-Host "PASS: interrupcao abrupta e reentrega; id=$($interrupted.id) tentativas=$($done.tentativas) conclusoes=$($done.conclusoes)"
 
     $failed = Request-Report $headers -Delay 1 -Fail $true
     $failure = Wait-Report $failed.id $headers -Status 'Falhou'
@@ -104,13 +104,13 @@ try {
         -Headers (Get-RabbitHeaders) -Method Post -ContentType 'application/json' `
         -Body '{"count":100,"ackmode":"ack_requeue_true","encoding":"auto"}'
     Assert-Lab ([bool]($messages | Where-Object { $_.payload -match [regex]::Escape($failed.id) })) 'Mensagem de falha nao encontrada na DLQ'
-    Write-Host 'PASS: tres tentativas e mensagem identificada na DLQ (mantida na fila)'
+    Write-Host "PASS: tres tentativas e mensagem identificada na DLQ (mantida na fila); id=$($failed.id) tentativas=$($failure.tentativas) conclusoes=$($failure.conclusoes)"
 
     Invoke-Docker compose up -d --force-recreate web
     Invoke-Docker compose up -d --wait --wait-timeout 180
     $persisted = Invoke-RestMethod "http://localhost:8080/api/relatorios/$($first.id)" -Headers $headers
     Assert-Lab ($persisted.status -eq 'Concluido') 'Recriacao perdeu dados ou invalidou token Identity'
-    Write-Host 'PASS: persistencia e token apos recriacao'
+    Write-Host "PASS: persistencia e token apos recriacao; id=$($first.id) status=$($persisted.status)"
 } finally {
     Pop-Location
 }

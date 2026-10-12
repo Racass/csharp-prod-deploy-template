@@ -77,7 +77,8 @@ com os testes e as duas publicacoes aprovados.
 
 **Primeira publicacao:** repositorio publico nao torna o pacote automaticamente
 publico. Na sua pagina de Packages, abra cada pacote, **Package settings →
-Change visibility → Public**, confirme e teste o download sem login.
+Change visibility → Public** se estiver privado, confirme e teste o download
+sem login. Se ja estiver publico, nao precisa alterar.
 Se a interface nao oferecer essa opcao, verifique o proprietario/permissoes.
 
 ```powershell
@@ -85,6 +86,29 @@ Se a interface nao oferecer essa opcao, verifique o proprietario/permissoes.
   -ImageNamespace seuusuario/seurepositorio `
   -Version COMMIT_COMPLETO_PUBLICADO
 ```
+
+### Comprovar download anonimo
+
+Uma configuracao apenas vazia pode detectar automaticamente o helper de
+credenciais do Windows. Use uma entrada vazia explicita para ghcr.io, sem
+helpers, sem alterar a configuracao habitual nem fazer logout:
+
+```powershell
+$namespace = 'seuusuario/seurepositorio'
+$versao = 'COMMIT_COMPLETO_PUBLICADO'
+$anon = Join-Path $env:TEMP "docker-aula08-$([guid]::NewGuid())"
+New-Item -ItemType Directory -Path $anon | Out-Null
+'{"auths":{"ghcr.io":{}}}' |
+  Set-Content (Join-Path $anon 'config.json') -Encoding ascii
+docker --config $anon pull "ghcr.io/$namespace/web:$versao"
+docker --config $anon pull "ghcr.io/$namespace/worker:$versao"
+```
+
+Substitua os valores pelo namespace/commit publicados. Preserve o config.json
+sem segredos e as saidas/digests como evidencia. Manifest consulta o registro;
+pull baixa as camadas necessarias. Cache sozinho nao comprova acesso anonimo.
+Entradas unknown/unknown no indice podem ser atestacoes de proveniencia,
+nao outras plataformas executaveis.
 
 ## Experimentos de operacao
 
@@ -100,6 +124,7 @@ docker compose up -d worker
 # Observe recuperacao e resultados.
 docker compose up -d --scale worker=2
 # Solicite varias tarefas e identifique os workers nos logs.
+# Salve os logs do lote enquanto ambas as replicas ainda existem.
 docker compose up -d --scale worker=1
 # Solicite tarefa com atraso; aguarde estado Processando.
 docker compose kill -s SIGKILL worker
@@ -127,6 +152,19 @@ param, escalam, interrompem e recriam servicos. Nao execute em um ambiente real.
 Os resultados e mensagens sao preservados para inspecao. O teste sem outbox
 interrompe a web e deixa uma solicitacao orfa, intencionalmente.
 
+Para guardar todos os streams PowerShell, inclusive Write-Host/Information:
+
+```powershell
+$evidencias = Join-Path $env:TEMP "aula08-evidencias-$([guid]::NewGuid())"
+New-Item -ItemType Directory -Path $evidencias | Out-Null
+.\scripts\Test-Lab.ps1 *>&1 |
+  Tee-Object -FilePath (Join-Path $evidencias 'Test-Lab.log')
+```
+
+Repita para os outros dois scripts. Revise e sanitize antes de compartilhar;
+nao grave tokens ou cabecalhos de autenticacao. Logs de replica removida
+deixam de estar disponiveis no Compose: guarde a distribuicao antes de reduzir.
+
 ## Limitacoes de confiabilidade
 
 Fila duravel, mensagem persistente e confirmacao de publicacao nao tornam
@@ -134,6 +172,12 @@ banco e broker uma transacao atomica. Sem **Transactional Outbox**, a web pode
 cair depois de salvar e antes de publicar, deixando `AguardandoPublicacao`.
 Nao existe republicacao automatica nesse caso. Publicacao sem confirmacao
 retorna erro explicito e pode ter resultado incerto; nao prometa "exactly once".
+
+Na falha de publicacao, HTTP (Hypertext Transfer Protocol) 503 devolve
+`id` e `erro`. Consulte esse identificador autenticado em
+`GET /api/relatorios/{id}` ou na lista do usuario. Novo POST cria outro
+identificador: nao ha deduplicacao da requisicao nem republicacao automatica.
+Nao repita o pedido as cegas.
 
 O worker confirma consumo apos persistir e usa atualizacao atomica para evitar
 duplicar o resultado. Isso nao impede executar novamente calculos nem protege
@@ -151,6 +195,12 @@ Publique uma mudanca visivel no painel, execute `Start-Lab.ps1` com o novo
 commit e confirme a mudanca. Execute novamente com a versao anterior para
 reverter. Use mudancas compativeis com o schema: voltar a imagem nao desfaz
 migracoes de banco. Compose recria conteineres, sem garantia de disponibilidade.
+
+Compare contagem e identificadores dos relatorios antes/depois, alem do
+resultado de controle e da sessao. Registre digests: SHA (Secure Hash
+Algorithm) identifica codigo, mas nao impede sobrescrever a tag nem garante
+novo build identico com bases mutaveis. Fixacao de bases e politica de
+imutabilidade sao requisitos adicionais de producao.
 
 ```powershell
 docker compose down
