@@ -15,7 +15,16 @@ try {
     $done = Wait-Report $first.id $headers
     Assert-Lab ($done.conclusoes -eq 1) 'Resultado duplicado'
     $rows = $done.resultado | ConvertFrom-Json
-    Assert-Lab ($rows.Count -ge 1 -and $rows[0].Total -gt 0) 'Relatorio sem valores de pedidos'
+    $orders = @(Invoke-RestMethod 'http://localhost:8080/api/pedidos')
+    Assert-Lab (@($rows).Count -eq $orders.Count) 'Relatorio omitiu ou duplicou pedidos'
+    foreach ($order in $orders) {
+        $row = $rows | Where-Object { $_.Id -eq $order.id }
+        [decimal]$expected = 0
+        foreach ($line in $order.itens) {
+            $expected += [decimal]$line.quantidade * [decimal]$line.valorUnitario
+        }
+        Assert-Lab ([decimal]$row.Total -eq $expected -and $row.Cliente -eq $order.cliente) "Relatorio incorreto para pedido $($order.id)"
+    }
     $http = New-Object System.Net.Http.HttpClient
     try {
         $http.DefaultRequestHeaders.Add('Authorization', $other.Authorization)
