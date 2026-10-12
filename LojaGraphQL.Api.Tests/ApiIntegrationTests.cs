@@ -320,5 +320,13 @@ public sealed class ApiIntegrationTests
                 "ConnectionStrings:DefaultConnection",
                 $"Data Source={databasePath};Pooling=False");
         }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await base.DisposeAsync();
+            File.Delete(databasePath);
+            File.Delete(databasePath + "-wal");
+            File.Delete(databasePath + "-shm");
+        }
     }
 }
