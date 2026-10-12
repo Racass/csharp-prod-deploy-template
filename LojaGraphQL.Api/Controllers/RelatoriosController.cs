@@ -88,10 +88,13 @@ public sealed class RelatoriosController(
             or SocketException or TimeoutException)
         {
             logger.LogError(exception, "Publicacao do relatorio {ReportId} falhou", report.Id);
-            report.Status = StatusRelatorio.FalhaPublicacao;
-            report.Erro = "Publicacao nao confirmada; verificar broker. Nao ha outbox neste laboratorio.";
-            await db.SaveChangesAsync(ct);
-            return StatusCode(503, new { id = report.Id, erro = report.Erro });
+            const string error = "Publicacao nao confirmada; verificar broker. Nao ha outbox neste laboratorio.";
+            await db.Relatorios.Where(item => item.Id == report.Id &&
+                    item.Status == StatusRelatorio.AguardandoPublicacao && item.Conclusoes == 0)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(item => item.Status, StatusRelatorio.FalhaPublicacao)
+                    .SetProperty(item => item.Erro, error), ct);
+            return StatusCode(503, new { id = report.Id, erro = error });
         }
 
         await db.Relatorios.Where(item => item.Id == report.Id &&

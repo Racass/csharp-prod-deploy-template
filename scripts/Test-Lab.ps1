@@ -35,6 +35,26 @@ try {
         $http.Dispose()
     }
     Write-Host 'PASS: Identity, REST, GraphQL, mutation, relatorio e isolamento por usuario'
+    $duplicate = @{
+        properties = @{ delivery_mode = 2; content_type = 'application/json'; message_id = $first.id }
+        routing_key = 'relatorios'
+        payload = (@{ ReportId = $first.id } | ConvertTo-Json -Compress)
+        payload_encoding = 'string'
+    } | ConvertTo-Json
+    $published = Invoke-RestMethod 'http://localhost:15672/api/exchanges/%2F/amq.default/publish' `
+        -Headers (Get-RabbitHeaders) -Method Post -ContentType 'application/json' -Body $duplicate
+    Assert-Lab ([bool]$published.routed) 'Duplicata nao foi roteada para fila'
+    $deadline = (Get-Date).AddSeconds(20)
+    do {
+        $duplicateLogs = @(& docker compose logs --no-log-prefix worker)
+        $ignored = $duplicateLogs | Where-Object { $_ -match "Relatorio $($first.id) ja concluido; duplicata ignorada" }
+        if ($ignored) { break }
+        Start-Sleep -Seconds 1
+    } while ((Get-Date) -lt $deadline)
+    Assert-Lab ([bool]$ignored) 'Worker nao confirmou tratamento da duplicata'
+    $again = Wait-Report $first.id $headers
+    Assert-Lab ($again.conclusoes -eq 1 -and $again.tentativas -eq $done.tentativas) 'Reentrega apos conclusao repetiu efeito'
+    Write-Host 'PASS: duplicata apos conclusao ignorada sem repetir efeito ou tentativa'
 
     Invoke-Docker compose stop worker
     $pending = Request-Report $headers
