@@ -1,0 +1,38 @@
+@host = http://localhost:5231
+
+GET {{host}}/api/produtos
+Accept: application/json
+
+###
+
+GET {{host}}/api/pedidos/1
+Accept: application/json
+
+###
+
+POST {{host}}/register
+Content-Type: application/json
+
+{
+  "email": "aluno@fiap.com.br",
+  "password": "GraphQL#2026"
+}
+
+###
+
+POST {{host}}/login
+Content-Type: application/json
+
+{
+  "email": "aluno@fiap.com.br",
+  "password": "GraphQL#2026"
+}
+
+###
+
+POST {{host}}/graphql
+Content-Type: application/json
+
+{
+  "query": "{ produtos { nome preco } }"
+}

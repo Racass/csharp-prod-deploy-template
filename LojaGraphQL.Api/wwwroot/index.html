@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Loja — laboratorio de operacao</title>
+<style>
+body{font:16px system-ui;max-width:1100px;margin:32px auto;padding:0 20px;background:#111827;color:#e5e7eb}
+input,button{font:inherit;padding:8px;margin:4px}a{color:#93c5fd}table{width:100%;border-collapse:collapse}td,th{padding:10px;text-align:left;border-bottom:1px solid #475569}pre{white-space:pre-wrap;overflow-wrap:anywhere}#error{color:#fca5a5}fieldset{margin:20px 0}small{display:block}
+</style>
+<h1>Loja: relatórios em segundo plano</h1>
+<p>Laboratório local, não produção. <a href="/graphql">GraphQL</a> · <a href="http://localhost:15672" target="_blank" rel="noopener">RabbitMQ</a></p>
+<fieldset><legend>Identity: cadastre uma conta e entre</legend>
+<input id="email" type="email" placeholder="aluno@example.test" autocomplete="username">
+<input id="password" type="password" placeholder="Senha forte" autocomplete="current-password">
+<button id="register">Cadastrar</button><button id="login">Entrar</button><button id="logout">Sair</button>
+<small>Use dados fictícios. A senha deve conter maiúscula, minúscula, número e símbolo.</small></fieldset>
+<fieldset><legend>Solicitar relatório dos pedidos da loja</legend>
+<label>Atraso de processamento: <input id="delay" type="number" value="5" min="0" max="30"> segundos</label>
+<label><input id="fail" type="checkbox"> Falha permanente</label>
+<button id="request" disabled>Solicitar</button>
+<small>O relatório contém os pedidos de demonstração; o acesso ao resultado é restrito ao solicitante.</small></fieldset>
+<p id="message" role="status">Entre para acompanhar seus relatórios.</p><pre id="error" role="alert"></pre>
+<table><thead><tr><th>Identificador</th><th>Estado</th><th>Tentativas</th><th>Conclusões</th><th>Resultado / erro</th></tr></thead><tbody id="reports"></tbody></table>
+<script>
+let token = null;
+const $ = id => document.getElementById(id);
+async function api(path, body) {
+  const response = await fetch(path, {method: body === undefined ? 'GET' : 'POST', headers: {
+    'Content-Type':'application/json', ...(token ? {Authorization:`Bearer ${token}`} : {})},
+    ...(body === undefined ? {} : {body:JSON.stringify(body)})});
+  const text = await response.text();
+  if (!response.ok) throw new Error(`${response.status}: ${text}`);
+  return text ? JSON.parse(text) : null;
+}
+async function action(fn) {
+  $('error').textContent = '';
+  try { await fn(); } catch(error) { $('error').textContent = error.message; }
+}
+function credentials() { return {email:$('email').value, password:$('password').value}; }
+$('register').onclick = () => action(async () => { await api('/register',credentials()); $('message').textContent='Cadastro concluído. Entre com sua conta.'; });
+$('login').onclick = () => action(async () => { const result=await api('/login',credentials()); token=result.accessToken; $('password').value=''; $('request').disabled=false; $('message').textContent='Autenticado; atualização automática a cada 2 segundos.'; await refresh(); });
+$('logout').onclick = () => { token=null; $('request').disabled=true; $('reports').replaceChildren(); $('message').textContent='Sessão encerrada.'; };
+$('request').onclick = () => action(async () => { const result=await api('/api/relatorios',{atrasoSegundos:Number($('delay').value),falhaPermanente:$('fail').checked}); $('message').textContent=`Solicitação aceita: ${result.id}`; await refresh(); });
+async function refresh() {
+  if (!token) return;
+  const reports=await api('/api/relatorios');
+  $('reports').replaceChildren();
+  for(const report of reports) {
+    const row=document.createElement('tr');
+    for(const value of [report.id,report.status,report.tentativas,report.conclusoes,report.resultado || report.erro || '—']) {
+      const cell=document.createElement('td'); cell.textContent=value; row.append(cell);
+    }
+    $('reports').append(row);
+  }
+}
+setInterval(() => { if(token) action(refresh); },2000);
+</script>
+</html>

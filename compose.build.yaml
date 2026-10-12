@@ -1,0 +1,9 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: LojaGraphQL.Api/Dockerfile
+  worker:
+    build:
+      context: .
+      dockerfile: LojaGraphQL.Worker/Dockerfile

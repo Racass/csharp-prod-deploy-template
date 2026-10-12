@@ -1,0 +1,14 @@
+**/.dockerignore
+**/.git
+**/.gitignore
+**/.vs
+**/bin
+**/obj
+**/*.db
+**/*.env
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/secrets.json
+**/*.user
+**/*.suo
+README.md

@@ -1,0 +1,72 @@
+name: loja-lab
+
+x-application: &application
+  ConnectionStrings__DefaultConnection: Host=database;Database=loja;Username=loja;Password=${POSTGRES_PASSWORD:?Configure .env}
+  Rabbit__Host: rabbitmq
+  Rabbit__User: loja
+  Rabbit__Password: ${RABBIT_PASSWORD:?Configure .env}
+
+services:
+  database:
+    image: postgres:17.6
+    environment:
+      POSTGRES_DB: loja
+      POSTGRES_USER: loja
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure .env}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loja -d loja"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.1.4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: loja
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD:?Configure .env}
+    ports:
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  web:
+    image: ghcr.io/${IMAGE_NAMESPACE:?Informe namespace}/web:${IMAGE_TAG:?Informe versao}
+    environment:
+      <<: *application
+      Laboratorio: "true"
+      DataProtection__Path: /keys
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - identity-keys:/keys
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  worker:
+    image: ghcr.io/${IMAGE_NAMESPACE:?Informe namespace}/worker:${IMAGE_TAG:?Informe versao}
+    environment: *application
+    depends_on:
+      web:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  database:
+  rabbitmq:
+  identity-keys:

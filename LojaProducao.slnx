@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="LojaGraphQL.Api.Tests/LojaGraphQL.Api.Tests.csproj" />
+  <Project Path="LojaGraphQL.Api/LojaGraphQL.Api.csproj" />
+  <Project Path="LojaGraphQL.Core/LojaGraphQL.Core.csproj" />
+  <Project Path="LojaGraphQL.Worker/LojaGraphQL.Worker.csproj" />
+</Solution>
