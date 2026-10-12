@@ -34,8 +34,12 @@ O professor fornece a versao completa de commit de uma imagem publica de
 referencia. Nao e preciso configurar contas de nuvem ou autenticar no registro.
 
 ```powershell
-.\scripts\Start-Lab.ps1 -Version COMMIT_PUBLICADO_PELO_PROFESSOR
+.\scripts\Start-Lab.ps1 -Version (Get-Content .\reference-version.txt).Trim()
 ```
+
+`reference-version.txt` identifica uma versao de referencia publicada pelo
+professor. Use esse arquivo somente para a primeira execucao; depois informe
+o commit que voce publicou no seu proprio namespace.
 
 O script copia `.env.example` para `.env` se ainda nao existir, baixa as imagens
 e espera o ambiente ficar pronto. O argumento de versao e um commit hexadecimal
