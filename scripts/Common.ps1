@@ -1,4 +1,13 @@
 $ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Net.Http
+
+function Get-RabbitHeaders {
+    $line = Get-Content "$PSScriptRoot\..\.env" | Where-Object { $_ -match '^RABBIT_PASSWORD=' } | Select-Object -First 1
+    if (-not $line) { throw 'RABBIT_PASSWORD ausente no .env' }
+    $password = $line.Substring('RABBIT_PASSWORD='.Length)
+    return @{ Authorization = 'Basic ' + [Convert]::ToBase64String(
+        [Text.Encoding]::UTF8.GetBytes("loja:$password")) }
+}
 
 function Invoke-Docker {
     & docker @args

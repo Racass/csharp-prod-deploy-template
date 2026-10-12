@@ -39,8 +39,8 @@ referencia. Nao e preciso configurar contas de nuvem ou autenticar no registro.
 
 O script copia `.env.example` para `.env` se ainda nao existir, baixa as imagens
 e espera o ambiente ficar pronto. O argumento de versao e um commit hexadecimal
-real, nao o texto de exemplo. O namespace e a versao ficam no ambiente da
-sessao PowerShell; execute os proximos comandos no mesmo terminal.
+real, nao o texto de exemplo. O namespace e a versao ficam no `.env` e no ambiente da sessao PowerShell.
+Um novo terminal consegue operar a ultima versao configurada pelo script.
 
 - Web: http://localhost:8080 — cadastre uma conta ficticia e entre.
 - GraphQL/Nitro: http://localhost:8080/graphql — consultas e mutation da Aula 07.
@@ -116,6 +116,7 @@ broker se as metricas ainda nao refletirem o experimento.
 
 ```powershell
 .\scripts\Test-Lab.ps1
+.\scripts\Test-BrokerFailure.ps1
 .\scripts\Test-NoOutbox.ps1
 ```
 
@@ -158,8 +159,8 @@ Esse comando para e remove os conteineres, mas preserva os volumes.
 Nao use `docker system prune`. Para um reset intencional, confira o projeto,
 salve o que precisa e confirme explicitamente a remocao dos volumes.
 
-Em um novo terminal, execute `Start-Lab.ps1` novamente ou defina
-`IMAGE_NAMESPACE` e `IMAGE_TAG` no `.env` para a versao desejada.
+Para mudar a versao, execute `Start-Lab.ps1` novamente. Ele atualiza
+`IMAGE_NAMESPACE` e `IMAGE_TAG` no `.env`, preservando as demais configuracoes.
 
 ## Desenvolvimento e contingencia
 

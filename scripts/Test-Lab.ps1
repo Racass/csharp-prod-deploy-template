@@ -15,8 +15,15 @@ try {
     Assert-Lab ($done.conclusoes -eq 1) 'Resultado duplicado'
     $rows = $done.resultado | ConvertFrom-Json
     Assert-Lab ($rows.Count -ge 1 -and $rows[0].Total -gt 0) 'Relatorio sem valores de pedidos'
-    $access = Invoke-WebRequest "http://localhost:8080/api/relatorios/$($first.id)" -Headers $other -SkipHttpErrorCheck
-    Assert-Lab ([int]$access.StatusCode -eq 404) 'Vazamento de relatorio entre usuarios'
+    $http = New-Object System.Net.Http.HttpClient
+    try {
+        $http.DefaultRequestHeaders.Add('Authorization', $other.Authorization)
+        $access = $http.GetAsync("http://localhost:8080/api/relatorios/$($first.id)").GetAwaiter().GetResult()
+        Assert-Lab ([int]$access.StatusCode -eq 404) 'Vazamento de relatorio entre usuarios'
+        $access.Dispose()
+    } finally {
+        $http.Dispose()
+    }
     Write-Host 'PASS: Identity, REST, GraphQL, mutation, relatorio e isolamento por usuario'
 
     Invoke-Docker compose stop worker
@@ -24,10 +31,14 @@ try {
     Start-Sleep -Seconds 2
     $state = Invoke-RestMethod "http://localhost:8080/api/relatorios/$($pending.id)" -Headers $headers
     Assert-Lab ($state.status -eq 'NaFila') 'Mensagem nao permaneceu pendente'
+    $queue = Invoke-RestMethod 'http://localhost:15672/api/queues/%2F/relatorios' -Headers (Get-RabbitHeaders)
+    Assert-Lab ($queue.messages_ready -ge 1) 'Fila sem mensagem pendente no broker'
+    Invoke-Docker compose up -d --force-recreate rabbitmq
+    Invoke-Docker compose up -d --wait --wait-timeout 180 rabbitmq
     Invoke-Docker compose up -d worker
     $done = Wait-Report $pending.id $headers
     Assert-Lab ($done.conclusoes -eq 1) 'Recuperacao duplicou resultado'
-    Write-Host 'PASS: worker parado e recuperacao'
+    Write-Host 'PASS: worker parado, mensagem sobrevive a recriacao do broker e recuperacao'
 
     Invoke-Docker compose up -d --scale worker=2
     $batch = 1..4 | ForEach-Object { Request-Report $headers -Delay 2 }
@@ -37,7 +48,12 @@ try {
     }
     $workers = @(& docker compose ps -q worker | Where-Object { $_ })
     Assert-Lab ($workers.Count -eq 2) 'Dois workers nao ficaram ativos'
-    Write-Host 'PASS: dois workers ativos e quatro resultados unicos; conferir distribuicao nos logs'
+    $logs = @(& docker compose logs --no-log-prefix worker)
+    $ids = ($batch.id | ForEach-Object { [regex]::Escape($_) }) -join '|'
+    $distribution = @($logs | Where-Object { $_ -match "Relatorio ($ids) tentativa \d+ worker " } |
+        ForEach-Object { if ($_ -match 'worker (\S+)$') { $Matches[1] } } | Sort-Object -Unique)
+    Assert-Lab ($distribution.Count -eq 2) 'Lote nao demonstrou processamento por dois workers'
+    Write-Host "PASS: quatro resultados unicos, distribuidos entre workers $($distribution -join ', ')"
 
     Invoke-Docker compose up -d --scale worker=1
     $interrupted = Request-Report $headers -Delay 10
@@ -52,8 +68,11 @@ try {
     $failure = Wait-Report $failed.id $headers -Status 'Falhou'
     Assert-Lab ($failure.tentativas -eq 3 -and $failure.conclusoes -eq 0) 'Tentativas nao limitadas a tres'
     Start-Sleep -Seconds 2
-    Invoke-Docker compose exec -T rabbitmq rabbitmqctl list_queues name messages
-    Write-Host 'PASS: falha permanente limitada; conferir relatorios.dlq acima'
+    $messages = Invoke-RestMethod 'http://localhost:15672/api/queues/%2F/relatorios.dlq/get' `
+        -Headers (Get-RabbitHeaders) -Method Post -ContentType 'application/json' `
+        -Body '{"count":100,"ackmode":"ack_requeue_true","encoding":"auto"}'
+    Assert-Lab ([bool]($messages | Where-Object { $_.payload -match [regex]::Escape($failed.id) })) 'Mensagem de falha nao encontrada na DLQ'
+    Write-Host 'PASS: tres tentativas e mensagem identificada na DLQ (mantida na fila)'
 
     Invoke-Docker compose up -d --force-recreate web
     Invoke-Docker compose up -d --wait --wait-timeout 180
