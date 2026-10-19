@@ -290,7 +290,7 @@ public sealed class ApiIntegrationTests
         Assert.AreEqual(quantidadeInicial, await CountProdutosAsync(client));
     }
 
-    private static WebApplicationFactory<Program> CreateFactory()
+    internal static WebApplicationFactory<Program> CreateFactory()
         => new TestApplicationFactory();
 
     private static async Task<int> CountProdutosAsync(HttpClient client)

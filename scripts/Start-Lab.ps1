@@ -33,6 +33,9 @@ try {
     if (-not $assistant.chaveConfigurada) {
         Write-Warning 'GEMINI_API_KEY ausente. Configure no .env e execute docker compose up -d assistente.'
     }
+    if ([string]::IsNullOrWhiteSpace($assistant.modelo)) {
+        Write-Warning 'GEMINI_MODEL ausente. Escolha um modelo gratuito com ferramentas no .env e recrie o assistente.'
+    }
     Write-Host 'Saude nao valida chave/cota Gemini; envie uma pergunta para verificar o provedor.'
     Write-Host 'Web: http://localhost:8080 | GraphQL: http://localhost:8080/graphql'
     Write-Host 'RabbitMQ: http://localhost:15672 | usuario: loja | senha: RABBIT_PASSWORD do .env'

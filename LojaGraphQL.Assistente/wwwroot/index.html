@@ -20,10 +20,15 @@ summary{cursor:pointer;font-weight:bold}#answer{white-space:pre-wrap;overflow-wr
   <p id="health" role="status">Verificando assistente e loja...</p>
   <button id="refresh" type="button">Atualizar saúde</button>
   <p class="muted">A saúde não chama o Gemini nem comprova a validade da chave. Uma pergunta real verifica o provedor.</p>
+  <p id="setup" class="error"></p>
+  <p><a href="http://localhost:8080/api/produtos" target="_blank" rel="noopener">Conferir produtos na loja</a>
+    · <a href="http://localhost:8080/api/pedidos" target="_blank" rel="noopener">Conferir pedidos e identificadores</a></p>
 </section>
 <section>
   <h2>Faça uma pergunta</h2>
   <p class="muted">Experimente consultar o catálogo, pedir o resumo de pedidos ou consultar um identificador existente na loja.</p>
+  <p><button type="button" data-example="Quais produtos estão disponíveis no catálogo da loja?">Exemplo: catálogo</button>
+    <button type="button" data-example="Consulte os pedidos e informe as contagens por estado e o valor total.">Exemplo: resumo de pedidos</button></p>
   <form id="form">
     <label for="question">Pergunta (até 2000 caracteres)</label>
     <textarea id="question" maxlength="2000" required placeholder="Quais produtos estão disponíveis na loja?"></textarea>
@@ -50,10 +55,17 @@ async function health() {
     if (!response.ok) throw new Error('Não foi possível verificar a saúde.');
     const data = await response.json();
     $('health').textContent = `Assistente: ${data.assistente} | Loja: ${data.lojaDisponivel ? 'disponível' : 'indisponível'} | Chave: ${data.chaveConfigurada ? 'configurada' : 'ausente'} | Modelo: ${data.modelo || 'não configurado'}`;
+    $('setup').textContent = !data.chaveConfigurada || !data.modelo
+      ? 'Antes de perguntar: configure GEMINI_API_KEY e GEMINI_MODEL no arquivo .env e execute docker compose up -d assistente. Não cole sua chave no chat.'
+      : '';
   } catch (error) { $('health').textContent = error.message; }
   finally { $('refresh').disabled = false; }
 }
 $('refresh').addEventListener('click', health);
+document.querySelectorAll('[data-example]').forEach(button => button.addEventListener('click', () => {
+  $('question').value = button.dataset.example;
+  $('question').focus();
+}));
 $('form').addEventListener('submit', async event => {
   event.preventDefault();
   $('send').disabled = true;

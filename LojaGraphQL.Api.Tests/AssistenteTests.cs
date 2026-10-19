@@ -187,6 +187,48 @@ public sealed class AssistenteTests
     }
 
     [TestMethod]
+    public async Task FluxoHttpCompletoExecutaTresFerramentasSobreLojaRealComModeloControlado()
+    {
+        await using WebApplicationFactory<LojaGraphQL.Api.Program> store =
+            ApiIntegrationTests.CreateFactory();
+        using HttpClient storeClient = store.CreateClient();
+        JsonElement[] pedidos = await storeClient.GetFromJsonAsync<JsonElement[]>("/api/pedidos") ?? [];
+        int id = pedidos[0].GetProperty("id").GetInt32();
+        ScriptedModel model = new((contents, _) => contents.Count == 1
+            ? JsonSerializer.SerializeToElement(new
+            {
+                role = "model",
+                parts = new object[]
+                {
+                    new { functionCall = new { name = "ConsultarProdutos", args = new { } } },
+                    new { functionCall = new { name = "ConsultarPedido", args = new { id } } },
+                    new { functionCall = new { name = "ResumirPedidos", args = new { } } },
+                },
+            })
+            : Element("""{"role":"model","parts":[{"text":"Resposta de teste controlado, nao Gemini real."}]}"""));
+        await using WebApplicationFactory<LojaGraphQL.Assistente.Program> original = new();
+        await using WebApplicationFactory<LojaGraphQL.Assistente.Program> assistant =
+            original.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IModelClient>(model);
+                services.AddSingleton(new LojaTools(storeClient));
+            }));
+        using HttpClient client = assistant.CreateClient();
+        using HttpResponseMessage response = await client.PostAsJsonAsync("/api/chat",
+            new { pergunta = $"Consulte catalogo, pedido {id} e resumo." });
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        JsonElement body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        JsonElement traces = body.GetProperty("ferramentas");
+        Assert.AreEqual(3, traces.GetArrayLength());
+        Assert.AreEqual(id, traces[1].GetProperty("resultado").GetProperty("id").GetInt32());
+        Assert.AreEqual(pedidos.Length, traces[2].GetProperty("resultado").GetProperty("totalPedidos").GetInt32());
+        decimal expected = pedidos.Sum(p => p.GetProperty("itens").EnumerateArray()
+            .Sum(i => i.GetProperty("quantidade").GetInt32() * i.GetProperty("valorUnitario").GetDecimal()));
+        Assert.AreEqual(expected, traces[2].GetProperty("resultado").GetProperty("valorTotal").GetDecimal());
+        Assert.AreEqual(2, model.Calls);
+    }
+
+    [TestMethod]
     public async Task PaginaSaudeEChaveAusenteSaoExplicitasSemChamarGemini()
     {
         await using WebApplicationFactory<LojaGraphQL.Assistente.Program> original = new();
