@@ -1,238 +1,165 @@
-# Loja: mensageria, entrega e operacao local
+# Aula 09 - Assistente com IA na loja
 
-Template da Aula 08: continuidade da loja da Aula 07, com GraphQL (Graph Query
-Language), ASP.NET Core Identity e API (Application Programming Interface)
-REST (Representational State Transfer). Inclui PostgreSQL, RabbitMQ, web e
-worker C# em .NET 10.
+IA (Inteligencia Artificial) integrada a C#: perguntas em linguagem natural,
+ferramentas somente leitura e respostas baseadas nos dados ficticios da loja.
+O projeto chega pronto: a atividade e observar, experimentar e conferir.
 
-**Isto e um laboratorio, nao uma configuracao pronta para producao.**
-Compartilhar banco entre web e worker e uma simplificacao; quatro conteineres
-nao equivalem a quatro microservicos autonomos. Docker Compose nao e Kubernetes.
+Esta branch `aula09-ia` evolui a Aula08 sem alterar `main` ou `gabarito`.
+O projeto usa .NET 10 e acrescenta um quinto servico aos quatro anteriores.
+E um laboratorio local, nao uma configuracao pronta para producao.
 
-## Comece aqui
+## Preparacao
 
-Use **Use this template → Create a new repository** e crie um repositorio
-publico. Nao use fork para esta atividade: queremos verificar a publicacao
-no namespace do seu proprio repositorio. Clone no computador e abra PowerShell
-na raiz. Requisitos: Docker Desktop iniciado com conteineres Linux e Docker
-Compose com suporte a `--wait`. Git e acesso ao GitHub/registro tambem sao
-necessarios. SDK (Software Development Kit) .NET 10 so e necessario para
-desenvolver/testar C# fora dos conteineres.
+Requisitos: Git, PowerShell, Docker Desktop em modo Linux e acesso a internet.
+Nao e necessario instalar .NET para executar as imagens publicadas.
 
 ```powershell
-docker version
-docker compose version
+git clone --branch aula09-ia --single-branch https://github.com/Racass/csharp-prod-deploy-template.git
+Set-Location csharp-prod-deploy-template
+Copy-Item .env.example .env
 ```
 
-O Docker Desktop inclui Compose. Se `docker` nao for encontrado depois de
-uma instalacao, abra um novo terminal. Se o mecanismo Linux nao responder,
-inicie o Docker Desktop e resolva os avisos de virtualizacao antes da atividade.
+Nao substitua um `.env` existente: preserve as configuracoes e acrescente os
+campos Gemini. Nao use "Use this template" esperando que a branch nao padrao
+seja selecionada automaticamente.
 
-## Primeira execucao
+Uma pessoa por dupla deve criar sua chave no
+[Google AI Studio](https://aistudio.google.com/apikey), usando um projeto na
+camada gratuita, sem ativar faturamento. No arquivo `.env` ignorado pelo Git,
+preencha `GEMINI_API_KEY`. Confira tambem `GEMINI_MODEL`: o exemplo usa um
+modelo documentado com ferramentas, mas disponibilidade e cotas devem ser
+verificadas no projeto da dupla. Nao ha troca automatica para modelos pagos.
 
-O professor fornece a versao completa de commit de uma imagem publica de
-referencia. Nao e preciso configurar contas de nuvem ou autenticar no registro.
+Nao envie a chave ao professor, ao GitHub ou ao navegador. Nao a coloque
+no codigo, imagem, workflow, print, resposta HTTP ou evidencia.
+HTTP (Hypertext Transfer Protocol, protocolo de transferencia de hipertexto)
+e usado internamente para consultar a loja; o provedor usa conexao HTTPS
+(HTTP Secure, HTTP seguro).
+
+Use apenas dados ficticios. Na camada gratuita, conteudo pode ser usado para
+melhorar produtos do Google. Cotas sao por projeto, nao por chave.
+Consulte [precos](https://ai.google.dev/gemini-api/docs/pricing) e
+[limites atuais](https://ai.google.dev/gemini-api/docs/rate-limits).
+
+## Executar a versao pronta
 
 ```powershell
-.\scripts\Start-Lab.ps1 -Version COMMIT_PUBLICADO_PELO_PROFESSOR
+.\scripts\Start-Lab.ps1 -Version (Get-Content .\reference-version.txt).Trim()
 ```
 
-O script copia `.env.example` para `.env` se ainda nao existir, baixa as imagens
-e espera o ambiente ficar pronto. O argumento de versao e um commit hexadecimal
-real, nao o texto de exemplo. O namespace e a versao ficam no `.env` e no ambiente da sessao PowerShell.
-Um novo terminal consegue operar a ultima versao configurada pelo script.
+- Assistente, saude e rastreio: http://localhost:8081
+- Loja existente: http://localhost:8080
+- Consultas de produtos: http://localhost:8080/api/produtos
+- Consultas de pedidos: http://localhost:8080/api/pedidos
+- RabbitMQ: http://localhost:15672 (credenciais de laboratorio no `.env`)
 
-- Web: http://localhost:8080 — cadastre uma conta ficticia e entre.
-- GraphQL/Nitro: http://localhost:8080/graphql — consultas e mutation da Aula 07.
-- RabbitMQ: http://localhost:15672 — usuario `loja`, senha indicada por
-  `RABBIT_PASSWORD` em `.env`.
+O deploy ja esta implementado. Nao e necessario editar workflows ou publicar
+imagens para esta atividade. `reference-version.txt` identifica uma publicacao;
+a existencia de imagens nao comprova que Gemini foi validado com uma chave real.
 
-Solicite um relatorio no painel. Veja fila `relatorios`, estado, tentativas e
-resultado. O resultado resume pedidos de demonstracao da loja; somente o
-solicitante pode consultar seu relatorio.
+A pagina mostra saude local, acesso a web e se existe chave configurada.
+**Chave configurada nao significa chave valida, cota disponivel ou provedor
+validado.** O painel de saude nao envia chamadas ao Gemini.
+Depois de alterar `.env`, execute `docker compose up -d assistente`.
 
-## Seu exercicio: GitHub Actions
+## Arquitetura
 
-CI (Continuous Integration, integracao continua) executa testes e constroi
-imagens. A entrega publica imagens no GHCR (GitHub Container Registry); o
-deploy local e **manual**, nao CD (Continuous Deployment, deploy continuo).
+```text
+Navegador -> Assistente C# :8081 -> Gemini
+                   |
+                   +-> Web :8080 -> PostgreSQL
 
-Na branch principal, `.github\workflows\entrega.yml` e um exercicio: os testes
-funcionam, mas a publicacao ainda precisa ser implementada. Complete:
+RabbitMQ e worker continuam ativos para os relatorios da Aula08.
+Nao participam do caminho de uma pergunta ao assistente.
+```
 
-1. Job `publish` dependente de `tests`, com `packages: write` somente nesse job.
-2. Checkout e namespace em minusculas derivado de `github.repository`.
-3. Login em `ghcr.io` com `github.actor` e `secrets.GITHUB_TOKEN`.
-4. Build/push dos dois Dockerfiles, usando o commit completo como tag.
-5. Resumo informando namespace e versao publicados.
+O modelo solicita ferramentas; o C# valida e executa os metodos. O assistente
+nao acessa o banco diretamente, nao executa SQL livre e nao escreve dados.
+SQL (Structured Query Language, linguagem de consulta estruturada) nao e
+uma ferramenta disponivel para o modelo.
 
-Use o [gabarito do template original](https://github.com/Racass/csharp-prod-deploy-template/tree/gabarito)
-como referencia; ele nao aparece automaticamente no repositorio criado a
-partir da branch principal. Nao copie
-credenciais pessoais para YAML (YAML Ain't Markup Language) ou para o Git.
-O token do workflow e fornecido pelo GitHub; nao crie um token pessoal.
+As consultas retornam dados ficticios compartilhados da loja. Nao diga
+"meus pedidos": nao ha personalizacao por usuario nesta atividade.
+A autorizacao existente da Aula08 permanece, mas nao e o assunto desta aula.
 
-Depois de um push, acompanhe **Actions → entrega**. O workflow precisa terminar
-com os testes e as duas publicacoes aprovados.
+## Ferramentas prontas
 
-**Primeira publicacao:** repositorio publico nao torna o pacote automaticamente
-publico. Na sua pagina de Packages, abra cada pacote, **Package settings →
-Change visibility → Public** se estiver privado, confirme e teste o download
-sem login. Se ja estiver publico, nao precisa alterar.
-Se a interface nao oferecer essa opcao, verifique o proprietario/permissoes.
+| Ferramenta | Entrada | Retorno |
+|---|---|---|
+| `ConsultarProdutos` | `termo` e `categoria` opcionais | Produtos, precos, estoque e indicacao de lista parcial |
+| `ConsultarPedido` | `id` inteiro positivo | Cliente ficticio, estado, itens e total calculado em C# |
+| `ResumirPedidos` | Nenhuma | Contagens por estado e valores calculados em C# |
+
+Os totais usam `Quantidade * ValorUnitario` dos itens, nao o preco atual do
+catalogo. A consulta de produtos limita a resposta a 20 registros, e a de
+pedido a 30 itens, informando truncamento. O resumo calcula sobre todos os
+pedidos ativos retornados pela loja, nao sobre uma pagina silenciosamente parcial.
+O pequeno conjunto de dados e uma simplificacao didatica.
+
+## Experimentos
+
+1. Abra produtos e pedidos na loja para conhecer os dados e identificadores.
+2. Pergunte quais produtos de uma categoria existente estao disponiveis.
+3. Consulte um pedido pelo identificador. Confira estado, itens e total.
+4. Peca o resumo dos pedidos. Compare contagens e valores com a fonte.
+5. Reformule uma pergunta e observe se a ferramenta ou apenas a prosa mudou.
+
+O rastreio mostra somente ferramentas realmente executadas: nome, argumentos,
+dados e duracao. Nao representa o raciocinio interno do modelo.
+Cada envio e independente; nao ha memoria entre perguntas.
+Uma resposta sem ferramenta nao comprova consulta a dados atuais.
+
+Registre pergunta, rastreio e conferencia dos fatos. Nao exija uma sequencia
+literal de ferramentas ou a mesma redacao entre respostas.
+
+## Codigo para acompanhar a demonstracao
+
+- `LojaGraphQL.Assistente\GeminiClient.cs`: instrucoes, contratos enviados
+  e chamada ao modelo, preservando assinaturas das respostas de ferramentas.
+- `LojaGraphQL.Assistente\ChatService.cs`: ciclo limitado de execucao.
+- `LojaGraphQL.Assistente\LojaTools.cs`: tres ferramentas e calculos C#.
+- `LojaGraphQL.Assistente\Program.cs`: endpoints e erros explicitos.
+- `LojaGraphQL.Assistente\wwwroot\index.html`: pagina sem chave no navegador.
+
+O endpoint `POST /api/chat` recebe `{ "pergunta": "Resumo dos pedidos" }` e
+retorna resposta e ferramentas executadas. O servidor limita perguntas a
+2000 caracteres, tres rodadas de ferramentas, cinco chamadas de ferramenta
+e espera total de 90 segundos. Nao realiza repeticoes ilimitadas.
+Erros de chave, cota, rede e contrato sao explicitos; nao ha resposta
+simulada disfarcada. Esses erros nao sao experimentos obrigatorios da aula.
+
+## Validacao e desenvolvimento
 
 ```powershell
-.\scripts\Start-Lab.ps1 `
-  -ImageNamespace seuusuario/seurepositorio `
-  -Version COMMIT_COMPLETO_PUBLICADO
+dotnet test LojaProducao.slnx -c Release
+# Build local opcional; nao e o caminho principal da atividade.
+docker compose -f compose.yaml -f compose.build.yaml up -d --build --wait
+# Com chave e modelo configurados: verificacao REAL do provedor.
+.\scripts\Test-Assistente.ps1
 ```
 
-### Comprovar download anonimo
+Os testes automatizados usam respostas controladas e nao exigem chave.
+O script real compara o rastreio com consultas independentes da loja e falha
+explicitamente se nao houver configuracao ou se a consulta nao for comprovada.
+Ele nao substitui a analise critica da resposta final em linguagem natural.
 
-Uma configuracao apenas vazia pode detectar automaticamente o helper de
-credenciais do Windows. Use uma entrada vazia explicita para ghcr.io, sem
-helpers, sem alterar a configuracao habitual nem fazer logout:
+Para execucao sem Docker, configure `GEMINI_API_KEY` e `GEMINI_MODEL` somente
+no processo local, ou `Gemini:ApiKey` e `Gemini:Model` com User Secrets.
+O Compose nao monta User Secrets automaticamente.
 
-```powershell
-$namespace = 'seuusuario/seurepositorio'
-$versao = 'COMMIT_COMPLETO_PUBLICADO'
-$anon = Join-Path $env:TEMP "docker-aula08-$([guid]::NewGuid())"
-New-Item -ItemType Directory -Path $anon | Out-Null
-'{"auths":{"ghcr.io":{}}}' |
-  Set-Content (Join-Path $anon 'config.json') -Encoding ascii
-docker --config $anon pull "ghcr.io/$namespace/web:$versao"
-docker --config $anon pull "ghcr.io/$namespace/worker:$versao"
-```
+## Publicacao pronta e preservacao
 
-Substitua os valores pelo namespace/commit publicados. Preserve o config.json
-sem segredos e as saidas/digests como evidencia. Manifest consulta o registro;
-pull baixa as camadas necessarias. Cache sozinho nao comprova acesso anonimo.
-Entradas unknown/unknown no indice podem ser atestacoes de proveniencia,
-nao outras plataformas executaveis.
-
-## Experimentos de operacao
-
-Execute no mesmo terminal do deploy. Antes de provocar falhas, identifique
-os servicos com `docker compose ps`. Banco e broker nao sao expostos na rede
-externa; as portas de acesso ficam em `127.0.0.1`.
-
-```powershell
-docker compose logs -f worker
-docker compose stop worker
-# Solicite tarefas no painel: fila cresce, web continua atendendo.
-docker compose up -d worker
-# Observe recuperacao e resultados.
-docker compose up -d --scale worker=2
-# Solicite varias tarefas e identifique os workers nos logs.
-# Salve os logs do lote enquanto ambas as replicas ainda existem.
-docker compose up -d --scale worker=1
-# Solicite tarefa com atraso; aguarde estado Processando.
-docker compose kill -s SIGKILL worker
-docker compose up -d worker
-```
-
-`SIGKILL` interrompe abruptamente; nao substitua por `stop` neste experimento.
-Mensagens nao confirmadas podem ser reentregues. O resultado persistido deve
-continuar com uma conclusao, apesar de mais de uma tentativa.
-
-Selecione **Falha permanente** no painel: sao no maximo **3 tentativas**.
-A mensagem termina em `relatorios.dlq`: DLQ (Dead Letter Queue, fila de
-mensagens nao processaveis). Em RabbitMQ, observe `Ready` e `Unacked`
-(mensagens disponiveis e entregues sem confirmacao). Atualize o painel do
-broker se as metricas ainda nao refletirem o experimento.
-
-```powershell
-.\scripts\Test-Lab.ps1
-.\scripts\Test-BrokerFailure.ps1
-.\scripts\Test-NoOutbox.ps1
-```
-
-Os scripts usam contas ficticias novas e **alteram o ambiente do laboratorio**:
-param, escalam, interrompem e recriam servicos. Nao execute em um ambiente real.
-Os resultados e mensagens sao preservados para inspecao. O teste sem outbox
-interrompe a web e deixa uma solicitacao orfa, intencionalmente.
-
-Para guardar todos os streams PowerShell, inclusive Write-Host/Information:
-
-```powershell
-$evidencias = Join-Path $env:TEMP "aula08-evidencias-$([guid]::NewGuid())"
-New-Item -ItemType Directory -Path $evidencias | Out-Null
-.\scripts\Test-Lab.ps1 *>&1 |
-  Tee-Object -FilePath (Join-Path $evidencias 'Test-Lab.log')
-```
-
-Repita para os outros dois scripts. Revise e sanitize antes de compartilhar;
-nao grave tokens ou cabecalhos de autenticacao. Logs de replica removida
-deixam de estar disponiveis no Compose: guarde a distribuicao antes de reduzir.
-
-## Limitacoes de confiabilidade
-
-Fila duravel, mensagem persistente e confirmacao de publicacao nao tornam
-banco e broker uma transacao atomica. Sem **Transactional Outbox**, a web pode
-cair depois de salvar e antes de publicar, deixando `AguardandoPublicacao`.
-Nao existe republicacao automatica nesse caso. Publicacao sem confirmacao
-retorna erro explicito e pode ter resultado incerto; nao prometa "exactly once".
-
-Na falha de publicacao, HTTP (Hypertext Transfer Protocol) 503 devolve
-`id` e `erro`. Consulte esse identificador autenticado em
-`GET /api/relatorios/{id}` ou na lista do usuario. Novo POST cria outro
-identificador: nao ha deduplicacao da requisicao nem republicacao automatica.
-Nao repita o pedido as cegas.
-
-O worker confirma consumo apos persistir e usa atualizacao atomica para evitar
-duplicar o resultado. Isso nao impede executar novamente calculos nem protege
-efeitos externos, como enviar email ou cobrar um pagamento. Interrupcoes
-contam como tentativas; ao atingir o limite, o relatorio falha.
-
-As chaves Identity ficam em volume para que recriar a web nao invalide tokens.
-Tokens expiram normalmente. REST/GraphQL mantem os contratos didaticos da
-Aula 07; nao sao uma auditoria de autorizacao pronta para producao.
-Credenciais do `.env.example` sao publicas e apenas para laboratorio.
-
-## Atualizar, reverter e parar
-
-Publique uma mudanca visivel no painel, execute `Start-Lab.ps1` com o novo
-commit e confirme a mudanca. Execute novamente com a versao anterior para
-reverter. Use mudancas compativeis com o schema: voltar a imagem nao desfaz
-migracoes de banco. Compose recria conteineres, sem garantia de disponibilidade.
-
-Compare contagem e identificadores dos relatorios antes/depois, alem do
-resultado de controle e da sessao. Registre digests: SHA (Secure Hash
-Algorithm) identifica codigo, mas nao impede sobrescrever a tag nem garante
-novo build identico com bases mutaveis. Fixacao de bases e politica de
-imutabilidade sao requisitos adicionais de producao.
+O workflow testa a solucao e publica web, worker e assistente no
+GHCR (GitHub Container Registry, registro de conteineres do GitHub).
+Todas as imagens usam o commit como versao. A chave nao e necessaria no build.
+Confira leitura publica das tres imagens apos a primeira publicacao.
+O deploy e local e manual; nao e deploy automatico em nuvem.
 
 ```powershell
 docker compose down
 ```
 
-Esse comando para e remove os conteineres, mas preserva os volumes.
-**Nao use `down -v` durante os experimentos:** ele apaga banco, filas e chaves.
-Nao use `docker system prune`. Para um reset intencional, confira o projeto,
-salve o que precisa e confirme explicitamente a remocao dos volumes.
-
-Para mudar a versao, execute `Start-Lab.ps1` novamente. Ele atualiza
-`IMAGE_NAMESPACE` e `IMAGE_TAG` no `.env`, preservando as demais configuracoes.
-
-## Desenvolvimento e contingencia
-
-```powershell
-dotnet tool restore
-dotnet test .\LojaProducao.slnx
-# Build local separado: nao demonstra o download das imagens publicadas.
-$env:IMAGE_NAMESPACE = 'racass/csharp-prod-deploy-template'
-$env:IMAGE_TAG = 'local'
-Copy-Item .env.example .env  # somente se .env ainda nao existir
-docker compose -f compose.yaml -f compose.build.yaml up -d --build --wait
-```
-
-Migracoes PostgreSQL pertencem a web; somente ela as aplica antes de atender.
-Testes rapidos usam SQLite (Structured Query Language Lite), enquanto o
-teste E2E (end-to-end, ponta a ponta) verifica o PostgreSQL real.
-
-## Entrega
-
-Informe o repositorio, a execucao aprovada do Actions e a versao das imagens.
-Registre evidencias da fila acumulada, recuperacao, dois workers, reentrega
-sem resultado duplicado e falha permanente. Explique a janela sem outbox e
-a diferenca entre publicar uma imagem e fazer deploy.
+Nao use `down -v`: os volumes contem os dados e chaves de sessao da loja.
+Nao opere projetos Docker de outras pessoas.
+O [roteiro historico da Aula08](README-Aula08.md) permanece como referencia,
+mas seus exercicios nao devem ser refeitos nesta aula.

@@ -2,7 +2,7 @@ name: entrega
 
 on:
   push:
-    branches: [main, gabarito]
+    branches: [main, gabarito, aula09-ia]
   workflow_dispatch:
 
 permissions:
@@ -54,6 +54,14 @@ jobs:
           file: LojaGraphQL.Worker/Dockerfile
           push: true
           tags: ${{ steps.image.outputs.base }}/worker:${{ steps.image.outputs.version }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+      - name: Publicar assistente
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: LojaGraphQL.Assistente/Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.base }}/assistente:${{ steps.image.outputs.version }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
       - name: Versao para o deploy local
         run: echo "Namespace ${{ github.repository }} — versao ${{ steps.image.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"

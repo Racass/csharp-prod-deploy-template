@@ -1,4 +1,8 @@
 services:
+  assistente:
+    build:
+      context: .
+      dockerfile: LojaGraphQL.Assistente/Dockerfile
   web:
     build:
       context: .

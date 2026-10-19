@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aula 09 — Assistente da loja</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui;background:#0a0a0f;color:#f5f5f7}
+body{max-width:1000px;margin:auto;padding:24px}h1{border-left:5px solid #ed0973;padding-left:14px}
+section,details{background:#14141c;border:1px solid #2d2d3a;border-radius:10px;padding:18px;margin:16px 0}
+textarea{box-sizing:border-box;width:100%;min-height:95px;padding:12px;font:inherit}
+button{background:#b00757;color:white;border:0;border-radius:6px;padding:12px 20px;cursor:pointer}
+button:disabled{opacity:.5;cursor:wait}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.muted{color:#b1b1bb}.error{color:#ff8eab}a{color:#ff5aa8}label{display:block;margin-bottom:10px}
+summary{cursor:pointer;font-weight:bold}#answer{white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+<h1>Assistente da loja — IA (Inteligência Artificial)</h1>
+<p>Laboratório somente leitura: produtos e pedidos fictícios compartilhados. Cada pergunta é independente.</p>
+<section aria-labelledby="health-title">
+  <h2 id="health-title">Saúde e configuração</h2>
+  <p id="health" role="status">Verificando assistente e loja...</p>
+  <button id="refresh" type="button">Atualizar saúde</button>
+  <p class="muted">A saúde não chama o Gemini nem comprova a validade da chave. Uma pergunta real verifica o provedor.</p>
+</section>
+<section>
+  <h2>Faça uma pergunta</h2>
+  <p class="muted">Experimente consultar o catálogo, pedir o resumo de pedidos ou consultar um identificador existente na loja.</p>
+  <form id="form">
+    <label for="question">Pergunta (até 2000 caracteres)</label>
+    <textarea id="question" maxlength="2000" required placeholder="Quais produtos estão disponíveis na loja?"></textarea>
+    <p><button id="send">Consultar</button> <span id="progress" role="status"></span></p>
+  </form>
+  <p id="error" class="error" role="alert"></p>
+</section>
+<section aria-live="polite">
+  <h2>Resposta do modelo</h2>
+  <p id="answer">Nenhuma pergunta enviada.</p>
+  <p class="muted">Confira os fatos na loja e no rastreio. Texto convincente não garante correção.</p>
+</section>
+<section>
+  <h2>Ferramentas executadas pelo C#</h2>
+  <p class="muted">Argumentos, dados retornados e duração observada. Isto não é o raciocínio interno do modelo.</p>
+  <div id="trace">Nenhuma execução.</div>
+</section>
+<script>
+const $ = id => document.getElementById(id);
+async function health() {
+  $('refresh').disabled = true;
+  try {
+    const response = await fetch('/api/status');
+    if (!response.ok) throw new Error('Não foi possível verificar a saúde.');
+    const data = await response.json();
+    $('health').textContent = `Assistente: ${data.assistente} | Loja: ${data.lojaDisponivel ? 'disponível' : 'indisponível'} | Chave: ${data.chaveConfigurada ? 'configurada' : 'ausente'} | Modelo: ${data.modelo || 'não configurado'}`;
+  } catch (error) { $('health').textContent = error.message; }
+  finally { $('refresh').disabled = false; }
+}
+$('refresh').addEventListener('click', health);
+$('form').addEventListener('submit', async event => {
+  event.preventDefault();
+  $('send').disabled = true;
+  $('progress').textContent = 'Consultando...';
+  $('error').textContent = '';
+  $('answer').textContent = '';
+  $('trace').replaceChildren();
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({pergunta: $('question').value})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || `Erro HTTP ${response.status}.`);
+    $('answer').textContent = data.resposta;
+    if (!data.ferramentas.length) $('trace').textContent = 'O modelo respondeu sem executar ferramentas. Confira se a pergunta exigia dados da loja.';
+    for (const [index, trace] of data.ferramentas.entries()) {
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = `${index + 1}. ${trace.nome} — ${trace.duracaoMs} ms`;
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify({argumentos: trace.argumentos, resultado: trace.resultado}, null, 2);
+      details.append(summary, pre);
+      $('trace').append(details);
+    }
+  } catch (error) { $('error').textContent = error.message; $('answer').textContent = 'A consulta não foi concluída.'; }
+  finally { $('send').disabled = false; $('progress').textContent = ''; }
+});
+health();
+</script>
+</html>

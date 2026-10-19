@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\LojaGraphQL.Assistente\LojaGraphQL.Assistente.csproj" />
     <ProjectReference Include="..\LojaGraphQL.Api\LojaGraphQL.Api.csproj" />
   </ItemGroup>
 

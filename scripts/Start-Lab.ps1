@@ -20,7 +20,7 @@ try {
             $settings += "$($entry.Key)=$($entry.Value)"
         }
     }
-    Set-Content '.env' -Value $settings -Encoding ascii
+    Set-Content '.env' -Value $settings -Encoding utf8
     $env:IMAGE_NAMESPACE = $ImageNamespace
     $env:IMAGE_TAG = $Version
     Invoke-Docker compose config --quiet
@@ -28,6 +28,12 @@ try {
     Invoke-Docker compose up -d --wait --wait-timeout 180
     Invoke-Docker compose ps
     Invoke-RestMethod 'http://localhost:8080/health' | Out-Null
+    $assistant = Invoke-RestMethod 'http://localhost:8081/api/status'
+    Write-Host 'Assistente: http://localhost:8081 | chat, saude e ferramentas C#'
+    if (-not $assistant.chaveConfigurada) {
+        Write-Warning 'GEMINI_API_KEY ausente. Configure no .env e execute docker compose up -d assistente.'
+    }
+    Write-Host 'Saude nao valida chave/cota Gemini; envie uma pergunta para verificar o provedor.'
     Write-Host 'Web: http://localhost:8080 | GraphQL: http://localhost:8080/graphql'
     Write-Host 'RabbitMQ: http://localhost:15672 | usuario: loja | senha: RABBIT_PASSWORD do .env'
     Write-Host 'Namespace e versao foram salvos no .env e definidos nesta sessao.'
