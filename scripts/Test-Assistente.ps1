@@ -9,8 +9,8 @@ if (-not $status.chaveConfigurada) {
     throw 'Gemini real nao validado: configure GEMINI_API_KEY no assistente.'
 }
 if (-not $status.lojaDisponivel) { throw 'A loja nao esta disponivel para a validacao.' }
-$products = @(Invoke-RestMethod "$StoreUrl/api/produtos")
-$orders = @(Invoke-RestMethod "$StoreUrl/api/pedidos")
+[object[]]$products = Invoke-RestMethod "$StoreUrl/api/produtos"
+[object[]]$orders = Invoke-RestMethod "$StoreUrl/api/pedidos"
 if ($products.Count -eq 0 -or $orders.Count -eq 0) {
     throw 'A demonstracao exige ao menos um produto e um pedido ficticio.'
 }
