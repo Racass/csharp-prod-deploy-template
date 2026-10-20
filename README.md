@@ -3,6 +3,8 @@
 IA (Inteligencia Artificial) integrada a C#: perguntas em linguagem natural,
 ferramentas somente leitura e respostas baseadas nos dados ficticios da loja.
 O projeto chega pronto: a atividade e observar, experimentar e conferir.
+Cada aluno realiza o laboratorio individualmente, com seu proprio ambiente,
+sua chave pessoal e suas evidencias.
 
 Esta branch `aula09-ia` evolui a Aula08 sem alterar `main` ou `gabarito`.
 O projeto usa .NET 10 e acrescenta um quinto servico aos quatro anteriores.
@@ -23,12 +25,12 @@ Nao substitua um `.env` existente: preserve as configuracoes e acrescente os
 campos Gemini. Nao use "Use this template" esperando que a branch nao padrao
 seja selecionada automaticamente.
 
-Uma pessoa por dupla deve criar sua chave no
+Cada aluno deve criar sua chave pessoal no
 [Google AI Studio](https://aistudio.google.com/apikey), usando um projeto na
 camada gratuita, sem ativar faturamento. No arquivo `.env` ignorado pelo Git,
 preencha `GEMINI_API_KEY`. Confira tambem `GEMINI_MODEL`: o exemplo usa um
 modelo documentado com ferramentas, mas disponibilidade e cotas devem ser
-verificadas no projeto da dupla. Nao ha troca automatica para modelos pagos.
+verificadas no projeto do aluno. Nao ha troca automatica para modelos pagos.
 
 Nao envie a chave ao professor, ao GitHub ou ao navegador. Nao a coloque
 no codigo, imagem, workflow, print, resposta HTTP ou evidencia.
